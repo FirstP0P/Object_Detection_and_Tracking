@@ -9,8 +9,9 @@ This project is a **modular, real-time computer vision system** that performs:
 * Direction-aware Vehicle Counting (IN / OUT)
 * Interactive Line Selection (dynamic + redraw support)
 * Performance Evaluation (Temporal & Cycle Consistency)
+* Experiment Logging (timestamp-based output storage)
 
-It is designed to simulate **real-world traffic analytics systems** used in:
+It simulates **real-world traffic analytics systems** used in:
 
 * Smart cities
 * Surveillance systems
@@ -26,15 +27,15 @@ It is designed to simulate **real-world traffic analytics systems** used in:
 * Real-time object detection (YOLOv8)
 * Persistent tracking with unique IDs (SORT)
 * Direction-based vehicle counting (IN / OUT)
-* Slanted / perspective-aware line crossing
+* Perspective-aware line crossing (custom slanted lines)
 
 ---
 
 ### 🎮 Interactive Controls
 
-* 🖱️ Click to define counting lines
-* ⏸️ `p` → Pause / Resume video
-* 🎯 `r` → Redraw lines (when paused)
+* 🖱️ Click to define lines
+* ⏸️ `p` → Pause / Resume
+* 🎯 `r` → Redraw lines
 * ❌ `q` → Quit
 
 ---
@@ -43,15 +44,49 @@ It is designed to simulate **real-world traffic analytics systems** used in:
 
 * Frame skipping (process every 3rd frame)
 * Track reuse for skipped frames
-* Efficient single-pass pipeline
+* Single-pass pipeline (efficient)
 
 ---
 
 ### 📊 Evaluation System
 
-* Temporal Consistency (tracking stability)
-* Cycle Consistency (system robustness)
-* Counting metrics (IN / OUT / total crossings)
+#### Video Metrics
+
+* 📈 Temporal Consistency (tracking stability)
+* 🔄 Cycle Consistency (system robustness)
+* 🚗 IN / OUT counting metrics
+
+#### Image Metrics
+
+* Augmentation Consistency (robustness under transformations)
+
+---
+
+### 💾 Experiment Logging
+
+Outputs are **organized by type and timestamp**:
+
+```text
+data/output/
+├── image/
+│   └── 20260326_150210/
+│       ├── original.jpg
+│       ├── flipped.jpg
+│       ├── bright.jpg
+│       ├── metrics.txt
+│       └── graph.png
+│
+└── video/
+    └── 20260326_150305/
+        ├── video_metrics.txt
+        ├── temporal_graph.png
+        └── cycle_graph.png
+```
+
+✔ Separate folders for image & video
+✔ Timestamp-based runs
+✔ No overwriting
+✔ Fully reproducible
 
 ---
 
@@ -64,7 +99,10 @@ object_tracking_project/
 │   ├── input/
 │   │   ├── test.jpg
 │   │   └── test.mp4
+│   │
 │   └── output/
+│       ├── image/     # Image evaluation outputs
+│       └── video/     # Video evaluation outputs
 │
 ├── models/
 │   └── yolov8n.pt
@@ -78,9 +116,9 @@ object_tracking_project/
 │   │
 │   ├── utils/
 │   │   ├── draw_utils.py
-│   │   ├── video_utils.py                # Core pipeline
-│   │   ├── performance_video_utils.py    # Evaluation (video)
-│   │   └── performance_draw_utils.py     # Evaluation (image)
+│   │   ├── video_utils.py
+│   │   ├── performance_draw_utils.py
+│   │   └── performance_video_utils.py
 │   │
 │   └── config/
 │       └── config.py
@@ -95,10 +133,18 @@ object_tracking_project/
 
 ## ⚙️ System Architecture
 
-### 🧠 Core Pipeline
+### 🧠 Core Pipelines
+
+#### Video Pipeline
 
 ```
-Video → Detection (YOLOv8) → Tracking (SORT) → Line Crossing → Counting
+Video → Detection → Tracking → Line Crossing → Counting
+```
+
+#### Image Pipeline
+
+```
+Image → Detection → Augmentation → Evaluation
 ```
 
 ---
@@ -106,36 +152,36 @@ Video → Detection (YOLOv8) → Tracking (SORT) → Line Crossing → Counting
 ### 🔄 Modular Design
 
 ```
-process_video_stream()  ← Core Engine
-        ↓
-video_utils.py          → Visualization + Counting
-performance_video_utils.py → Metrics (reuse same pipeline)
+process_video_stream()  → core engine (video)
+process_image()         → core engine (image)
+
+↓ reused by ↓
+
+video_utils.py                → visualization
+performance_video_utils.py    → evaluation
+
+draw_utils.py                 → detection
+performance_draw_utils.py     → evaluation
 ```
 
-👉 Ensures:
-
-* No duplicate logic
-* Consistent evaluation
-* Scalable architecture
+✔ No duplicated logic
+✔ Consistent evaluation
+✔ Scalable architecture
 
 ---
 
 ## 🧠 How It Works
 
-### 1️⃣ Object Detection (YOLOv8)
+### 1️⃣ Detection (YOLOv8)
 
-* Each frame is processed by YOLO
-* Outputs:
-
-  * Bounding boxes
-  * Confidence scores
-  * Class IDs
+* Processes image/frame
+* Outputs bounding boxes, confidence, class
 
 ---
 
-### 2️⃣ Object Tracking (SORT)
+### 2️⃣ Tracking (SORT)
 
-* Assigns unique IDs to objects
+* Assigns unique IDs
 * Maintains identity across frames
 
 ---
@@ -144,13 +190,14 @@ performance_video_utils.py → Metrics (reuse same pipeline)
 
 * User defines 2 lines:
 
-  * Left line → IN direction
-  * Right line → OUT direction
+  * Left → IN
+  * Right → OUT
 * Uses:
 
-  * Object center point
-  * Distance-to-line + margin
+  * Object center
+  * Distance-to-line
   * Direction (movement)
+  * Margin (35 px)
 
 ---
 
@@ -158,11 +205,11 @@ performance_video_utils.py → Metrics (reuse same pipeline)
 
 ```
 If object crosses line AND direction is correct AND not counted before
-→ Increment count
+→ Count increment
 ```
 
-✔ Uses margin (35 px) for robustness
 ✔ Prevents double counting
+✔ Robust to noise
 
 ---
 
@@ -170,17 +217,13 @@ If object crosses line AND direction is correct AND not counted before
 
 #### 📈 Temporal Consistency
 
-* Measures smoothness of object motion
-* Lower value = stable tracking
-
----
+* Measures motion smoothness
+* Lower = better tracking
 
 #### 🔄 Cycle Consistency
 
-* Compares forward vs reversed tracking behavior
-* Lower value = stable system
-
----
+* Compares forward vs reversed behavior
+* Lower = stable system
 
 #### 🚗 Counting Metrics
 
@@ -192,7 +235,7 @@ If object crosses line AND direction is correct AND not counted before
 
 ## 🛠️ Installation
 
-### 1. Clone repository
+### 1. Clone Repository
 
 ```bash
 git clone https://github.com/FirstP0P/Object_Detection_and_Tracking.git
@@ -201,7 +244,7 @@ cd Object_Detection_and_Tracking
 
 ---
 
-### 2. Install dependencies
+### 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -209,13 +252,28 @@ pip install -r requirements.txt
 
 ---
 
-### 3. Setup SORT
+### 3. Download YOLO Model
+
+```python
+from ultralytics import YOLO
+YOLO("yolov8n.pt")
+```
+
+Move to:
+
+```
+models/yolov8n.pt
+```
+
+---
+
+### 4. Setup SORT
 
 ```bash
 git clone https://github.com/abewley/sort.git
 ```
 
-Copy `sort.py` to project root.
+Copy `sort.py` into project root.
 
 ---
 
@@ -241,11 +299,11 @@ python main.py
 
 ## 🖱️ Line Selection
 
-#### Click 4 points:
+1. Click 4 points:
 
-   * Points 1–2 → Left line (IN)
-   * Points 3–4 → Right line (OUT)
-
+   * Points 1–2 → IN line
+   * Points 3–4 → OUT line
+2. Press `q` to confirm
 
 ---
 
@@ -254,64 +312,51 @@ python main.py
 | Key | Action         |
 | --- | -------------- |
 | `p` | Pause / Resume |
-| `r` | Redraw lines (when paused)   |
+| `r` | Redraw lines   |
 | `q` | Quit           |
 
 ---
 
 ## 📊 Output
 
-### Visual Output
+### Visual
 
 * Bounding boxes + IDs
 * IN / OUT counters
-* Dynamic line overlay
+* Dynamic lines
 
 ---
 
-### Metrics Output
+### Saved Results
 
-* Temporal consistency graph
-* Cycle consistency graph
-* Console metrics summary
-
----
-
-## 🧠 Key Design Highlights
-
-* ✔ Single-pass processing (efficient)
-* ✔ Modular architecture (reusable core pipeline)
-* ✔ Real-time interaction (pause + redraw)
-* ✔ Robust counting (margin + direction + deduplication)
-* ✔ Consistent evaluation (same pipeline reused)
+* Image outputs → `data/output/image/`
+* Video outputs → `data/output/video/`
+* Metrics (TXT)
+* Graphs (PNG)
 
 ---
 
-## 🚀 Future Improvements
+## 🧠 Key Highlights
 
-* Class-based filtering (cars only)
-* IoU-based tracking accuracy
-* Precision / Recall / mAP
-* Speed estimation
-* Lane detection
-* Streamlit dashboard
-* Real-time webcam support
+* ✔ Modular architecture (clean + reusable)
+* ✔ Single-pass efficient processing
+* ✔ Interactive UI controls
+* ✔ Robust counting logic
+* ✔ Structured experiment logging
 
 ---
 
 ## 🏁 Conclusion
 
-This project goes beyond basic detection and implements a **complete AI pipeline**:
+This project implements a **complete AI pipeline**:
 
 ```
-Detection → Tracking → Counting → Evaluation
+Detection → Tracking → Counting → Evaluation → Logging
 ```
 
 It demonstrates:
 
-* System design thinking
-* Real-time processing
+* Real-time system design
 * Modular architecture
 * Performance evaluation
-
----
+* Experiment tracking
