@@ -1,4 +1,6 @@
 import cv2
+import os
+from datetime import datetime
 import matplotlib.pyplot as plt
 from src.utils.draw_utils import process_image
 
@@ -8,7 +10,17 @@ def run_image_performance():
 
     image_path = "data/input/test.jpg"
 
-    # Original
+    # -------------------------------
+    # CREATE TIMESTAMP FOLDER
+    # -------------------------------
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = os.path.join("data/output/image", timestamp)
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    # -------------------------------
+    # ORIGINAL IMAGE
+    # -------------------------------
     original_data = process_image(
         image_path=image_path,
         show=False,
@@ -21,20 +33,34 @@ def run_image_performance():
     original_img = original_data["image"]
     det_orig = original_data["detections"]
 
-    # Augmentations
+    # Save original
+    original_path = os.path.join(output_dir, "original.jpg")
+    cv2.imwrite(original_path, original_img)
+
+    # -------------------------------
+    # AUGMENTATIONS
+    # -------------------------------
     flipped = cv2.flip(original_img, 1)
     bright = cv2.convertScaleAbs(original_img, alpha=1.2, beta=30)
 
-    # Save temp images (simple reuse)
-    cv2.imwrite("temp_flip.jpg", flipped)
-    cv2.imwrite("temp_bright.jpg", bright)
+    flip_path = os.path.join(output_dir, "flipped.jpg")
+    bright_path = os.path.join(output_dir, "bright.jpg")
 
-    flip_data = process_image("temp_flip.jpg", show=False, return_data=True)
-    bright_data = process_image("temp_bright.jpg", show=False, return_data=True)
+    cv2.imwrite(flip_path, flipped)
+    cv2.imwrite(bright_path, bright)
 
-    det_flip = flip_data["detections"]
-    det_bright = bright_data["detections"]
+    # -------------------------------
+    # DETECTIONS (REUSE PIPELINE)
+    # -------------------------------
+    flip_data = process_image(flip_path, show=False, return_data=True)
+    bright_data = process_image(bright_path, show=False, return_data=True)
 
+    det_flip = flip_data["detections"] # type: ignore
+    det_bright = bright_data["detections"] # type: ignore
+
+    # -------------------------------
+    # METRICS
+    # -------------------------------
     counts = [len(det_orig), len(det_flip), len(det_bright)]
 
     print("📊 Detection Counts:")
@@ -42,8 +68,35 @@ def run_image_performance():
     print(f"Flipped : {counts[1]}")
     print(f"Bright  : {counts[2]}")
 
-    # Graph
+    # -------------------------------
+    # SAVE METRICS
+    # -------------------------------
+    metrics_path = os.path.join(output_dir, "metrics.txt")
+
+    with open(metrics_path, "w") as f:
+        f.write("Image Performance Metrics\n")
+        f.write("=========================\n\n")
+        f.write(f"Original Detections: {counts[0]}\n")
+        f.write(f"Flipped Detections : {counts[1]}\n")
+        f.write(f"Bright Detections  : {counts[2]}\n")
+
+    # -------------------------------
+    # SAVE GRAPH
+    # -------------------------------
+    graph_path = os.path.join(output_dir, "graph.png")
+
     plt.bar(["Original", "Flipped", "Bright"], counts)
     plt.title("Augmentation Consistency")
     plt.ylabel("Detections")
-    plt.show()
+    plt.savefig(graph_path)
+    plt.close()
+
+    print(f"\n💾 All results saved in: {output_dir}")
+    print("📁 Files:")
+    print(" - original.jpg")
+    print(" - flipped.jpg")
+    print(" - bright.jpg")
+    print(" - metrics.txt")
+    print(" - graph.png")
+
+    print("\n✅ Image evaluation completed\n")

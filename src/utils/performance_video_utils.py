@@ -1,3 +1,5 @@
+import os
+from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 from src.utils.video_utils import process_video_stream
@@ -8,8 +10,19 @@ def euclidean(p1, p2):
 
 
 def run_video_performance():
-    print("\n📊 Running Performance Evaluation...\n")
+    print("\n📊 Running Video Performance Evaluation...\n")
 
+    # -------------------------------
+    # CREATE TIMESTAMP FOLDER
+    # -------------------------------
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = os.path.join("data/output/video",timestamp)
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    # -------------------------------
+    # RUN CORE PIPELINE
+    # -------------------------------
     data = process_video_stream(
         video_path="data/input/test.mp4",
         show=True,
@@ -25,7 +38,7 @@ def run_video_performance():
     out_count = data["out_count"]
 
     # -------------------------------
-    # 1️⃣ TEMPORAL CONSISTENCY
+    # TEMPORAL CONSISTENCY
     # -------------------------------
     temporal_scores = []
 
@@ -47,14 +60,13 @@ def run_video_performance():
     temporal_mean = np.mean(temporal_scores)
 
     # -------------------------------
-    # 2️⃣ CYCLE CONSISTENCY
+    # CYCLE CONSISTENCY
     # -------------------------------
     reversed_tracks = list(reversed(all_tracks))
 
     cycle_scores = []
 
     for fwd_frame, bwd_frame in zip(all_tracks, reversed_tracks):
-        # Compare number of tracked objects
         diff = abs(len(fwd_frame) - len(bwd_frame))
         cycle_scores.append(diff)
 
@@ -63,28 +75,56 @@ def run_video_performance():
     # -------------------------------
     # PRINT RESULTS
     # -------------------------------
-    print(f"📈 Temporal Consistency: {temporal_mean:.2f} (lower is better)")
-    print(f"🔄 Cycle Consistency: {cycle_mean:.2f} (lower is better)")
+    print(f"📈 Temporal Consistency: {temporal_mean:.2f}")
+    print(f"🔄 Cycle Consistency: {cycle_mean:.2f}")
     print(f"🚗 IN Count: {in_count}")
     print(f"🚗 OUT Count: {out_count}")
     print(f"📊 Total Crossings: {len(crossings)}")
 
     # -------------------------------
-    # VISUALIZATION
+    # SAVE METRICS
     # -------------------------------
-    plt.figure(figsize=(10, 4))
+    metrics_path = os.path.join(output_dir, "video_metrics.txt")
 
-    plt.subplot(1, 2, 1)
+    with open(metrics_path, "w") as f:
+        f.write("Video Performance Metrics\n")
+        f.write("=========================\n\n")
+        f.write(f"Temporal Consistency: {temporal_mean:.2f}\n")
+        f.write(f"Cycle Consistency   : {cycle_mean:.2f}\n\n")
+        f.write(f"IN Count  : {in_count}\n")
+        f.write(f"OUT Count : {out_count}\n")
+        f.write(f"Total Crossings: {len(crossings)}\n")
+
+    # -------------------------------
+    # SAVE TEMPORAL GRAPH
+    # -------------------------------
+    temporal_graph_path = os.path.join(output_dir, "temporal_graph.png")
+
+    plt.figure()
     plt.plot(temporal_scores)
     plt.title("Temporal Consistency")
     plt.xlabel("Frame")
     plt.ylabel("Movement")
+    plt.savefig(temporal_graph_path)
+    plt.close()
 
-    plt.subplot(1, 2, 2)
+    # -------------------------------
+    # SAVE CYCLE GRAPH
+    # -------------------------------
+    cycle_graph_path = os.path.join(output_dir, "cycle_graph.png")
+
+    plt.figure()
     plt.plot(cycle_scores)
     plt.title("Cycle Consistency")
     plt.xlabel("Frame")
     plt.ylabel("Difference")
+    plt.savefig(cycle_graph_path)
+    plt.close()
 
-    plt.tight_layout()
-    plt.show()
+    print(f"\n💾 All results saved in: {output_dir}")
+    print("📁 Files:")
+    print(" - video_metrics.txt")
+    print(" - temporal_graph.png")
+    print(" - cycle_graph.png")
+
+    print("\n✅ Video evaluation completed\n")
