@@ -1,33 +1,57 @@
-# 🚗 Object Detection & Tracking System with Vehicle Counting
+# 🚗 Intelligent Object Detection, Tracking & Evaluation System
 
 ## 📌 Overview
 
-This project is a **real-time computer vision system** that performs:
+This project is a **modular, real-time computer vision system** that performs:
 
 * Object Detection using YOLOv8
-* Object Tracking using SORT
-* Direction-aware Vehicle Counting
-* Interactive Line Selection (user-defined)
-* Dynamic Line Adjustment during runtime
+* Multi-object Tracking using SORT
+* Direction-aware Vehicle Counting (IN / OUT)
+* Interactive Line Selection (dynamic + redraw support)
+* Performance Evaluation (Temporal & Cycle Consistency)
 
-It is designed to simulate **real-world traffic monitoring systems** used in:
+It is designed to simulate **real-world traffic analytics systems** used in:
 
 * Smart cities
 * Surveillance systems
-* Traffic analytics
+* Traffic monitoring
 * Autonomous systems
 
 ---
 
-## 🎯 Features
+## 🚀 Key Features
 
-* 🔍 Real-time object detection (YOLOv8)
-* 🧠 Multi-object tracking with unique IDs (SORT)
-* 📈 Vehicle counting (IN / OUT direction)
-* 🖱️ Click-based dynamic line selection
-* ⏸️ Pause & redraw lines during execution
-* 🎥 Video input + output saving
-* ⚡ Optimized performance (frame skipping)
+### 🔍 Core System
+
+* Real-time object detection (YOLOv8)
+* Persistent tracking with unique IDs (SORT)
+* Direction-based vehicle counting (IN / OUT)
+* Slanted / perspective-aware line crossing
+
+---
+
+### 🎮 Interactive Controls
+
+* 🖱️ Click to define counting lines
+* ⏸️ `p` → Pause / Resume video
+* 🎯 `r` → Redraw lines (when paused)
+* ❌ `q` → Quit
+
+---
+
+### ⚡ Performance Optimizations
+
+* Frame skipping (process every 3rd frame)
+* Track reuse for skipped frames
+* Efficient single-pass pipeline
+
+---
+
+### 📊 Evaluation System
+
+* Temporal Consistency (tracking stability)
+* Cycle Consistency (system robustness)
+* Counting metrics (IN / OUT / total crossings)
 
 ---
 
@@ -54,7 +78,9 @@ object_tracking_project/
 │   │
 │   ├── utils/
 │   │   ├── draw_utils.py
-│   │   └── video_utils.py
+│   │   ├── video_utils.py                # Core pipeline
+│   │   ├── performance_video_utils.py    # Evaluation (video)
+│   │   └── performance_draw_utils.py     # Evaluation (image)
 │   │
 │   └── config/
 │       └── config.py
@@ -67,83 +93,109 @@ object_tracking_project/
 
 ---
 
-## ⚙️ How the System Works
+## ⚙️ System Architecture
+
+### 🧠 Core Pipeline
+
+```
+Video → Detection (YOLOv8) → Tracking (SORT) → Line Crossing → Counting
+```
+
+---
+
+### 🔄 Modular Design
+
+```
+process_video_stream()  ← Core Engine
+        ↓
+video_utils.py          → Visualization + Counting
+performance_video_utils.py → Metrics (reuse same pipeline)
+```
+
+👉 Ensures:
+
+* No duplicate logic
+* Consistent evaluation
+* Scalable architecture
+
+---
+
+## 🧠 How It Works
 
 ### 1️⃣ Object Detection (YOLOv8)
 
-* Each frame is passed to a pretrained YOLOv8 model
-* The model detects objects and returns:
+* Each frame is processed by YOLO
+* Outputs:
 
-  * Bounding boxes `(x1, y1, x2, y2)`
-  * Confidence score
-  * Class ID (car, person, etc.)
-
-```
-Frame → YOLO → Objects Detected
-```
+  * Bounding boxes
+  * Confidence scores
+  * Class IDs
 
 ---
 
 ### 2️⃣ Object Tracking (SORT)
 
-* Detected objects are passed to the SORT tracker
-* SORT assigns a **unique ID** to each object
-* IDs remain consistent across frames
+* Assigns unique IDs to objects
+* Maintains identity across frames
+
+---
+
+### 3️⃣ Line Crossing Logic
+
+* User defines 2 lines:
+
+  * Left line → IN direction
+  * Right line → OUT direction
+* Uses:
+
+  * Object center point
+  * Distance-to-line + margin
+  * Direction (movement)
+
+---
+
+### 4️⃣ Counting Logic
 
 ```
-Detections → SORT → Track IDs
+If object crosses line AND direction is correct AND not counted before
+→ Increment count
 ```
 
----
-
-### 3️⃣ Vehicle Counting Logic
-
-* User defines **two lines** (left and right)
-* Each tracked object has a **center point**
-* When object crosses a line → count increases
-
-#### Direction Detection:
-
-* Moving down → IN count
-* Moving up → OUT count
+✔ Uses margin (35 px) for robustness
+✔ Prevents double counting
 
 ---
 
-### 4️⃣ Dynamic Line Selection
+### 5️⃣ Performance Metrics
 
-* User clicks **4 points**:
+#### 📈 Temporal Consistency
 
-  * 2 points → Left line (IN)
-  * 2 points → Right line (OUT)
-
----
-
-### 5️⃣ Interactive Controls
-
-| Key | Action                     |
-| --- | -------------------------- |
-| `p` | Pause / Resume video       |
-| `r` | Redraw lines (when paused) |
-| `q` | Quit                       |
+* Measures smoothness of object motion
+* Lower value = stable tracking
 
 ---
 
-## 🧠 Technologies Used
+#### 🔄 Cycle Consistency
 
-* Python
-* OpenCV
-* YOLOv8 (Ultralytics)
-* SORT (Simple Online Realtime Tracking)
-* NumPy
+* Compares forward vs reversed tracking behavior
+* Lower value = stable system
 
 ---
 
-## 🚀 Installation
+#### 🚗 Counting Metrics
 
-### 1. Clone the repository
+* IN count
+* OUT count
+* Total crossings
+
+---
+
+## 🛠️ Installation
+
+### 1. Clone repository
 
 ```bash
-git https://github.com/FirstP0P/Object_Detection_and_Tracking.git
+git clone https://github.com/FirstP0P/Object_Detection_and_Tracking.git
 cd Object_Detection_and_Tracking
 ```
 
@@ -157,28 +209,13 @@ pip install -r requirements.txt
 
 ---
 
-### 3. Download YOLO model
-
-```python
-from ultralytics import YOLO
-YOLO("yolov8n.pt")
-```
-
-Move the file to:
-
-```
-models/yolov8n.pt
-```
-
----
-
-### 4. Clone SORT
+### 3. Setup SORT
 
 ```bash
 git clone https://github.com/abewley/sort.git
 ```
 
-Copy `sort.py` into project root.
+Copy `sort.py` to project root.
 
 ---
 
@@ -190,72 +227,91 @@ python main.py
 
 ---
 
-## 🎮 Choose Mode
+## 🎮 Menu Options
 
 ```
 1 → Image Detection
 2 → Video Tracking
+3 → Video Performance Metrics
+4 → Image Performance Metrics
+0 → Exit
 ```
 
 ---
 
-### 🖼️ Image Detection
+## 🖱️ Line Selection
 
-* Input: `data/input/test.jpg`
-* Output: `data/output/image_output.jpg`
+#### Click 4 points:
 
----
+   * Points 1–2 → Left line (IN)
+   * Points 3–4 → Right line (OUT)
 
-### 🎥 Video Tracking
-
-* Input: `data/input/test.mp4`
-* Output: `data/output/output.mp4`
 
 ---
 
-## 🖱️ Line Selection Instructions
+## 🎥 Video Controls
 
-1. A window will open
-2. Click 4 points:
-
-   * Point 1 & 2 → Left line (IN)
-   * Point 3 & 4 → Right line (OUT)
-3. Press `q` to confirm
-
----
-
-## ⚡ Performance Optimizations
-
-* Frame skipping (process every 3rd frame)
-* Efficient tracking using SORT
-* Optional frame resizing
+| Key | Action         |
+| --- | -------------- |
+| `p` | Pause / Resume |
+| `r` | Redraw lines (when paused)   |
+| `q` | Quit           |
 
 ---
 
 ## 📊 Output
 
-* Bounding boxes with object IDs
-* Vehicle counts displayed on screen
-* Saved output video with overlays
+### Visual Output
+
+* Bounding boxes + IDs
+* IN / OUT counters
+* Dynamic line overlay
+
+---
+
+### Metrics Output
+
+* Temporal consistency graph
+* Cycle consistency graph
+* Console metrics summary
+
+---
+
+## 🧠 Key Design Highlights
+
+* ✔ Single-pass processing (efficient)
+* ✔ Modular architecture (reusable core pipeline)
+* ✔ Real-time interaction (pause + redraw)
+* ✔ Robust counting (margin + direction + deduplication)
+* ✔ Consistent evaluation (same pipeline reused)
 
 ---
 
 ## 🚀 Future Improvements
 
 * Class-based filtering (cars only)
+* IoU-based tracking accuracy
+* Precision / Recall / mAP
 * Speed estimation
 * Lane detection
-* Web dashboard (Streamlit)
+* Streamlit dashboard
 * Real-time webcam support
 
 ---
 
 ## 🏁 Conclusion
 
-This project demonstrates a **complete computer vision pipeline**:
+This project goes beyond basic detection and implements a **complete AI pipeline**:
 
 ```
-Detection → Tracking → Analytics
+Detection → Tracking → Counting → Evaluation
 ```
 
-It combines AI models with real-world logic to build a **practical, scalable system**.
+It demonstrates:
+
+* System design thinking
+* Real-time processing
+* Modular architecture
+* Performance evaluation
+
+---
