@@ -2,27 +2,49 @@ import cv2
 from src.detection.detector import ObjectDetector
 
 
-def run_image_detection():
+def process_image(image_path, show=True, return_data=False):
     detector = ObjectDetector("models/yolov8n.pt")
 
-    image_path = "data/input/test.jpg"
-    frame = cv2.imread(image_path)
+    image = cv2.imread(image_path)
 
-    if frame is None:
+    if image is None:
         print("❌ Image not found")
-        return
+        return None
 
-    detections = detector.detect(frame)
+    detections = detector.detect(image)
+
+    results = []
 
     for det in detections:
         x1, y1, x2, y2 = det["bbox"]
         conf = det["confidence"]
+        class_id = det["class_id"]
 
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(frame, f"{conf:.2f}", (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        results.append(det)
 
-    output_path = "data/output/image_output.jpg"
-    cv2.imwrite(output_path, frame)
+        if show:
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0,255,0), 2)
+            cv2.putText(image, f"{class_id} {conf:.2f}",
+                        (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                        (0,255,0), 2)
 
-    print(f"✅ Image detection saved at {output_path}")
+    if show:
+        cv2.imshow("Image Detection", image)
+
+        cv2.waitKey(1000)
+        cv2.destroyAllWindows()
+
+    if return_data:
+        return {
+            "detections": results,
+            "image": image
+        }
+
+
+def run_image_detection():
+    process_image(
+        image_path="data/input/test.jpg",
+        show=True,
+        return_data=False
+    )
