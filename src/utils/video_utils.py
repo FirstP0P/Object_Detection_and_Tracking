@@ -5,7 +5,8 @@ from src.tracking.tracker import ObjectTracker
 
 points = []
 
-MARGIN = 35  # 🔥 FIXED
+MARGIN = 35
+DETECTION_INTERVAL = 3  # tune: 2 = better, 3 = faster
 
 
 def select_points(event, x, y, flags, param):
@@ -89,6 +90,8 @@ def process_video_stream(video_path, show=True, collect_metrics=False):
     in_count = 0
     out_count = 0
 
+    last_tracks = []
+
     while True:
 
         if not paused:
@@ -98,23 +101,39 @@ def process_video_stream(video_path, show=True, collect_metrics=False):
 
             frame_count += 1
 
-            if frame_count % 3 != 0:
-                continue
+            # 🔥 Resize for faster detection
+            small_frame = cv2.resize(frame, (640, 360))
 
-            detections = detector.detect(frame)
+            run_detection = (frame_count % DETECTION_INTERVAL == 0)
 
-            dets_for_sort = []
-            for det in detections:
-                x1, y1, x2, y2 = det["bbox"]
-                conf = det["confidence"]
-                dets_for_sort.append([x1, y1, x2, y2, conf])
+            if run_detection:
+                detections = detector.detect(small_frame)
 
-            tracks = tracker.update(dets_for_sort)
+                scale_x = frame.shape[1] / 640
+                scale_y = frame.shape[0] / 360
+
+                dets_for_sort = []
+                for det in detections:
+                    x1, y1, x2, y2 = det["bbox"]
+                    conf = det["confidence"]
+
+                    x1 = int(x1 * scale_x)
+                    y1 = int(y1 * scale_y)
+                    x2 = int(x2 * scale_x)
+                    y2 = int(y2 * scale_y)
+
+                    dets_for_sort.append([x1, y1, x2, y2, conf])
+
+                tracks = tracker.update(dets_for_sort)
+                last_tracks = tracks
+
+            else:
+                tracks = last_tracks
 
             frame_data = {}
 
             if show:
-                cv2.line(frame, left_line[0], left_line[1], (255, 0, 0), 3) # type: ignore
+                cv2.line(frame, left_line[0], left_line[1], (255, 0, 0), 3)
                 cv2.line(frame, right_line[0], right_line[1], (0, 0, 255), 3) # type: ignore
 
             for track in tracks:
@@ -134,7 +153,6 @@ def process_video_stream(video_path, show=True, collect_metrics=False):
                 if track_id in object_positions:
                     prev_y = object_positions[track_id][1]
 
-                    # 🔵 IN
                     dist_left = distance_to_line(cx, cy, *left_line[0], *left_line[1])
                     if (
                         dist_left < MARGIN
@@ -145,7 +163,6 @@ def process_video_stream(video_path, show=True, collect_metrics=False):
                         counted_in.add(track_id)
                         crossing_events.append(("IN", frame_count))
 
-                    # 🔴 OUT
                     dist_right = distance_to_line(cx, cy, *right_line[0], *right_line[1]) # type: ignore
                     if (
                         dist_right < MARGIN
@@ -160,18 +177,20 @@ def process_video_stream(video_path, show=True, collect_metrics=False):
 
             all_tracks.append(frame_data)
 
-            if show:
-                cv2.putText(frame, f"IN: {in_count}", (20, 40),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 3)
-                cv2.putText(frame, f"OUT: {out_count}", (20, 80),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
+        # 🔥 Always display last frame
+        if show and frame is not None:
+            cv2.putText(frame, f"IN: {in_count}", (20, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 3)
+            cv2.putText(frame, f"OUT: {out_count}", (20, 80),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
 
-                cv2.imshow("Video", frame)
+            cv2.imshow("Video", frame)
 
         key = cv2.waitKey(30) & 0xFF
 
         if key == ord('p'):
             paused = not paused
+            print("⏸ Paused" if paused else "▶ Resumed")
 
         if paused and key == ord('r'):
             new_lines = select_lines(frame)
